@@ -92,8 +92,13 @@ tokenizer, bert_model = load_model()
 # Load regression model
 model_path = "model/personality_model.pkl"
 if os.path.exists(model_path):
-    personality_model = joblib.load(model_path)
+    try:
+        personality_model = joblib.load(model_path)
+    except:
+        st.warning("⚠️ Failed to load model. Using empty LinearRegression.")
+        personality_model = LinearRegression()
 else:
+    st.warning("⚠️ Model file not found. Using empty LinearRegression.")
     personality_model = LinearRegression()
 
 def get_bert_embedding(text):
