@@ -53,7 +53,7 @@ def predict_traits(text):
             prompt = f"""
             Analyze the following text and estimate the person's Big Five personality traits (Openness, Conscientiousness, Extraversion, Agreeableness, Neuroticism) on a scale from 0 to 1.
 
-            Text: """{text}"""
+            Text: \"\"\"{text}\"\"\"
 
             Respond only in this JSON format:
             {{
