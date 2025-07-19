@@ -1,5 +1,16 @@
 streamlit
+transformersstreamlit
 transformers
+torch
+scikit-learn
+joblib
+numpy
+opencv-python
+fer
+speechrecognition
+pyaudio
+google-generativeai
+
 torch
 joblib
 scikit-learn
