@@ -1,0 +1,7 @@
+streamlit
+transformers
+torch
+joblib
+scikit-learn
+fpdf
+SpeechRecognition
