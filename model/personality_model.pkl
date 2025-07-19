@@ -1,1 +1,17 @@
+# create_dummy_model.py
+import numpy as np
+from sklearn.linear_model import LinearRegression
+import joblib
+import os
+
+os.makedirs("model", exist_ok=True)
+
+X = np.random.rand(100, 768)  # fake BERT embeddings
+y = np.random.rand(100, 5)    # 5 personality traits
+
+model = LinearRegression()
+model.fit(X, y)
+
+joblib.dump(model, "model/personality_model.pkl")
+print("Dummy model saved to model/personality_model.pkl")
 
