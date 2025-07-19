@@ -10,26 +10,35 @@ from sklearn.linear_model import LinearRegression
 from transformers import BertTokenizer, BertModel
 from streamlit.components.v1 import html
 import speech_recognition as sr
+import google.generativeai as genai
 
 # Set page config
 st.set_page_config(page_title="AI Mirror", layout="wide")
 
-# Inject custom CSS for glassmorphism and cosmic theme
+# Custom CSS to match cosmos.so with responsiveness
 st.markdown("""
     <style>
-    body {
-        background-color: #0e0e0e;
-        color: white;
-        font-family: 'Segoe UI', sans-serif;
+    html, body, [class*="css"]  {
+        font-family: 'Inter', sans-serif;
+        background-color: #0d0d0d;
+        color: #ffffff;
     }
-    .glass {
+    .glass-box {
         background: rgba(255, 255, 255, 0.05);
-        border-radius: 16px;
-        box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
-        backdrop-filter: blur(10px);
-        -webkit-backdrop-filter: blur(10px);
+        border-radius: 20px;
         padding: 2rem;
         margin-bottom: 2rem;
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    }
+    @media (max-width: 768px) {
+        .glass-box {
+            padding: 1rem;
+        }
+        h1, h2, h3 {
+            font-size: 1.5rem !important;
+        }
     }
     </style>
 """, unsafe_allow_html=True)
@@ -80,7 +89,13 @@ html("""
 </div>
 """, height=80)
 
-# Load tokenizer and model
+# Gemini API integration
+api_key = "AIzaSyB0x7jMb8cF0OkKgdnetpzHKIbAgUpkEHQ"
+use_gemini = api_key is not None
+if use_gemini:
+    genai.configure(api_key=api_key)
+    gemini_model = genai.GenerativeModel('gemini-pro')
+
 @st.cache_resource
 def load_model():
     tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
@@ -89,17 +104,14 @@ def load_model():
 
 tokenizer, bert_model = load_model()
 
-# Load regression model
 model_path = "model/personality_model.pkl"
+model_loaded = False
 if os.path.exists(model_path):
     try:
         personality_model = joblib.load(model_path)
+        model_loaded = True
     except:
-        st.warning("⚠️ Failed to load model. Using empty LinearRegression.")
-        personality_model = LinearRegression()
-else:
-    st.warning("⚠️ Model file not found. Using empty LinearRegression.")
-    personality_model = LinearRegression()
+        st.error("❌ Failed to load the personality model.")
 
 def get_bert_embedding(text):
     inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True)
@@ -108,9 +120,32 @@ def get_bert_embedding(text):
     return outputs.last_hidden_state[:, 0, :].numpy()
 
 def predict_traits(text):
-    emb = get_bert_embedding(text)
-    preds = personality_model.predict(emb)
-    return preds[0]
+    try:
+        if use_gemini:
+            prompt = f"""
+            Analyze the following text and estimate the person's Big Five personality traits (Openness, Conscientiousness, Extraversion, Agreeableness, Neuroticism) on a scale from 0 to 1.
+
+            Text: """{text}"""
+
+            Respond only in this JSON format:
+            {{
+                "Openness": value,
+                "Conscientiousness": value,
+                "Extraversion": value,
+                "Agreeableness": value,
+                "Neuroticism": value
+            }}
+            """
+            response = gemini_model.generate_content(prompt)
+            parsed = json.loads(response.text.strip())
+            return [parsed["Openness"], parsed["Conscientiousness"], parsed["Extraversion"], parsed["Agreeableness"], parsed["Neuroticism"]]
+        else:
+            emb = get_bert_embedding(text)
+            preds = personality_model.predict(emb)
+            return preds[0]
+    except:
+        st.error("⚠️ Personality estimation failed. Please check your Gemini API key or try again.")
+        return [0.5] * 5
 
 def save_feedback(traits, feedback):
     os.makedirs("model", exist_ok=True)
@@ -119,7 +154,7 @@ def save_feedback(traits, feedback):
     if os.path.exists(file_path):
         with open(file_path, "r") as f:
             data = json.load(f)
-    data.append({"traits": traits.tolist(), "feedback": feedback, "timestamp": str(datetime.now())})
+    data.append({"traits": traits, "feedback": feedback, "timestamp": str(datetime.now())})
     with open(file_path, "w") as f:
         json.dump(data, f, indent=2)
 
@@ -135,24 +170,28 @@ def generate_pdf_report(traits):
     pdf.output(report_path)
     return report_path
 
-# --- LANDING PAGE ---
+# --- MAIN LAYOUT ---
 st.title("🌌 AI Mirror")
 st.subheader("Reveal Your Personality Through AI")
 
 with st.container():
+    st.markdown("<div class='glass-box'>", unsafe_allow_html=True)
     st.markdown("### 🔍 What is AI Mirror?")
-    st.write("AI Mirror is an AI-powered tool that analyzes your written or spoken words to estimate your personality traits using advanced language models.")
+    st.write("AI Mirror analyzes your words to estimate your Big Five personality traits using cutting-edge AI.")
 
     st.markdown("### 🧠 How it Works")
-    st.write("We use BERT embeddings combined with machine learning regression to predict Big Five traits (OCEAN model). You can type or speak a paragraph and get instant insights.")
+    st.write("We use Gemini or BERT to predict your personality. You can either type or speak.")
 
     st.markdown("### 🚀 Try it Now")
+    st.markdown("</div>", unsafe_allow_html=True)
 
-# --- USER INTERFACE ---
+# --- INPUT SECTION ---
 with st.container():
+    st.markdown("<div class='glass-box'>", unsafe_allow_html=True)
     st.markdown("## 🧾 Personality Estimator")
     input_option = st.radio("Choose Input Method:", ["Text", "Speech"])
 
+    user_input = ""
     if input_option == "Text":
         user_input = st.text_area("Enter something about yourself:")
     else:
@@ -168,24 +207,30 @@ with st.container():
                 st.error("Could not understand audio")
                 user_input = ""
 
-    if st.button("Predict Traits") and user_input.strip():
-        traits = predict_traits(user_input)
-        labels = ["Openness", "Conscientiousness", "Extraversion", "Agreeableness", "Neuroticism"]
-        for i, val in enumerate(traits):
-            st.progress(min(1.0, max(0.01, float(val))))
-            st.write(f"{labels[i]}: {val:.2f}")
+    if st.button("Predict Traits"):
+        if not model_loaded and not use_gemini:
+            st.error("🚫 No model or Gemini API key found.")
+            st.stop()
+        if not user_input.strip():
+            st.warning("Please provide some input text or speech.")
+        else:
+            traits = predict_traits(user_input)
+            labels = ["Openness", "Conscientiousness", "Extraversion", "Agreeableness", "Neuroticism"]
+            for i, val in enumerate(traits):
+                st.progress(min(1.0, max(0.01, float(val))), text=f"{labels[i]}: {val:.2f}")
 
-        report_path = generate_pdf_report(traits)
-        with open(report_path, "rb") as f:
-            st.download_button("📄 Download PDF Report", f, file_name="personality_report.pdf")
+            report_path = generate_pdf_report(traits)
+            with open(report_path, "rb") as f:
+                st.download_button("📄 Download PDF Report", f, file_name="personality_report.pdf")
 
-        st.markdown("#### Was this prediction accurate?")
-        feedback = st.radio("Your Feedback:", ["Yes", "No"])
-        if st.button("Submit Feedback"):
-            save_feedback(traits, feedback)
-            st.success("Feedback saved!")
+            st.markdown("#### Was this prediction accurate?")
+            feedback = st.radio("Your Feedback:", ["Yes", "No"])
+            if st.button("Submit Feedback"):
+                save_feedback(traits, feedback)
+                st.success("Feedback saved!")
+    st.markdown("</div>", unsafe_allow_html=True)
 
-# --- ADMIN SECTION ---
+# --- ADMIN ---
 with st.expander("🔐 Admin Dashboard"):
     st.markdown("### User Feedback Overview")
     try:
