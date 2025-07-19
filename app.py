@@ -109,16 +109,34 @@ def login():
             else:
                 st.error("Invalid username or password")
 
-        if st.checkbox("New user?"):
-            new_user = st.text_input("New Username")
-            new_pass = st.text_input("New Password", type="password")
-            if st.button("Register"):
-                if new_user in users:
-                    st.warning("User already exists")
-                else:
-                    users[new_user] = hash_password(new_pass)
-                    save_users(users)
-                    st.success("Registered! Please login.")
+register_mode = st.checkbox("New user? Create account")
+
+if not register_mode:
+    username = st.text_input("Username")
+    password = st.text_input("Password", type="password")
+    if st.button("Login"):
+        if username in users and users[username] == hash_password(password):
+            st.session_state.user = username
+            st.success(f"Welcome, {username}!")
+        else:
+            st.error("Invalid username or password")
+else:
+    new_username = st.text_input("Choose a username")
+    new_password = st.text_input("Choose a password", type="password")
+    confirm_password = st.text_input("Confirm password", type="password")
+
+    if st.button("Register"):
+        if new_username in users:
+            st.warning("Username already exists.")
+        elif new_password != confirm_password:
+            st.error("Passwords do not match.")
+        elif len(new_username.strip()) == 0 or len(new_password.strip()) < 4:
+            st.error("Please enter a valid username and a password with 4+ characters.")
+        else:
+            users[new_username] = hash_password(new_password)
+            save_users(users)
+            st.success("🎉 Registration successful. You can now log in.")
+
 
 login()
 if "user" not in st.session_state:
