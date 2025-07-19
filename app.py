@@ -53,7 +53,7 @@ def predict_traits(text):
             prompt = f"""
             Analyze the following text and estimate the person's Big Five personality traits (Openness, Conscientiousness, Extraversion, Agreeableness, Neuroticism) on a scale from 0 to 1.
 
-            Text: \"\"\"{text}\"\"\"
+            Text: """{text}"""
 
             Respond only in this JSON format:
             {{
@@ -75,11 +75,8 @@ def predict_traits(text):
         st.error("⚠️ Personality estimation failed. Please check your Gemini API key or try again.")
         return [0.5] * 5
 
-def detect_emotion():
+def detect_emotion_from_image(uploaded_file):
     detector = FER(mtcnn=True)
-    cap = cv2.VideoCapture(0)
-    stframe = st.empty()
-    result_text = st.empty()
     trait_output = [0.5] * 5
 
     emotion_to_traits = {
@@ -92,21 +89,18 @@ def detect_emotion():
         "fear": [0.4, 0.5, 0.4, 0.4, 0.9]
     }
 
-    with st.spinner("Detecting emotion from webcam..."):
-        ret, frame = cap.read()
-        if ret:
-            result = detector.detect_emotions(frame)
-            if result:
-                top_emotion, score = detector.top_emotion(frame)
-                if top_emotion in emotion_to_traits:
-                    trait_output = emotion_to_traits[top_emotion]
-                result_text.success(f"Detected emotion: {top_emotion.title()} ({score:.2f})")
-            else:
-                result_text.info("No face detected. Try adjusting lighting or position.")
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            stframe.image(frame, channels="RGB", use_column_width=True)
-        cap.release()
-        cv2.destroyAllWindows()
+    file_bytes = np.asarray(bytearray(uploaded_file.read()), dtype=np.uint8)
+    frame = cv2.imdecode(file_bytes, 1)
+    result = detector.detect_emotions(frame)
+    if result:
+        top_emotion, score = detector.top_emotion(frame)
+        if top_emotion in emotion_to_traits:
+            trait_output = emotion_to_traits[top_emotion]
+        st.success(f"Detected emotion: {top_emotion.title()} ({score:.2f})")
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        st.image(frame, channels="RGB", use_column_width=True)
+    else:
+        st.info("No face detected. Try another image.")
     return trait_output
 
 def save_feedback(traits, feedback):
@@ -122,9 +116,9 @@ def save_feedback(traits, feedback):
 
 # --- UI ---
 st.title("🧠 AI Mirror - Enhanced")
-st.markdown("Estimate your personality using text or your facial expressions.")
+st.markdown("Estimate your personality using text, speech, or uploaded facial expression image.")
 
-method = st.radio("Choose Input Method", ["Text", "Speech", "Facial Emotion"])
+method = st.radio("Choose Input Method", ["Text", "Speech", "Facial Emotion (Image Upload)"])
 input_text = ""
 
 if method == "Text":
@@ -140,9 +134,10 @@ elif method == "Speech":
             st.success(f"You said: {input_text}")
         except:
             st.error("Speech not recognized.")
-elif method == "Facial Emotion":
-    if st.button("📷 Start Camera & Detect Emotion"):
-        traits = detect_emotion()
+elif method == "Facial Emotion (Image Upload)":
+    uploaded_file = st.file_uploader("Upload an image of your face", type=["jpg", "png", "jpeg"])
+    if uploaded_file is not None:
+        traits = detect_emotion_from_image(uploaded_file)
         st.markdown("### Personality Traits Estimate:")
         labels = ["Openness", "Conscientiousness", "Extraversion", "Agreeableness", "Neuroticism"]
         for i, val in enumerate(traits):
