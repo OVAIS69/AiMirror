@@ -10,7 +10,6 @@ from sklearn.linear_model import LinearRegression
 from transformers import BertTokenizer, BertModel
 from streamlit.components.v1 import html
 import speech_recognition as sr
-import hashlib
 
 # Set page config
 st.set_page_config(page_title="AI Mirror", layout="wide")
@@ -80,67 +79,6 @@ html("""
 </svg>
 </div>
 """, height=80)
-
-# --- Authentication Setup ---
-users_file = "model/users.json"
-def load_users():
-    if os.path.exists(users_file):
-        with open(users_file, "r") as f:
-            return json.load(f)
-    return {}
-
-def save_users(users):
-    with open(users_file, "w") as f:
-        json.dump(users, f, indent=2)
-
-def hash_password(password):
-    return hashlib.sha256(password.encode()).hexdigest()
-
-def login():
-    users = load_users()
-    with st.sidebar:
-        st.subheader("🔐 Login")
-        username = st.text_input("Username")
-        password = st.text_input("Password", type="password")
-        if st.button("Login"):
-            if username in users and users[username] == hash_password(password):
-                st.session_state.user = username
-                st.success(f"Welcome, {username}!")
-            else:
-                st.error("Invalid username or password")
-
-register_mode = st.checkbox("New user? Create account")
-
-if not register_mode:
-    username = st.text_input("Username")
-    password = st.text_input("Password", type="password")
-    if st.button("Login"):
-        if username in users and users[username] == hash_password(password):
-            st.session_state.user = username
-            st.success(f"Welcome, {username}!")
-        else:
-            st.error("Invalid username or password")
-else:
-    new_username = st.text_input("Choose a username")
-    new_password = st.text_input("Choose a password", type="password")
-    confirm_password = st.text_input("Confirm password", type="password")
-
-    if st.button("Register"):
-        if new_username in users:
-            st.warning("Username already exists.")
-        elif new_password != confirm_password:
-            st.error("Passwords do not match.")
-        elif len(new_username.strip()) == 0 or len(new_password.strip()) < 4:
-            st.error("Please enter a valid username and a password with 4+ characters.")
-        else:
-            users[new_username] = hash_password(new_password)
-            save_users(users)
-            st.success("🎉 Registration successful. You can now log in.")
-
-
-login()
-if "user" not in st.session_state:
-    st.stop()
 
 # Load tokenizer and model
 @st.cache_resource
@@ -244,33 +182,29 @@ with st.container():
 
 # --- ADMIN SECTION ---
 with st.expander("🔐 Admin Dashboard"):
-    if st.session_state.user == "admin":
-        st.markdown("### User Feedback Overview")
-        try:
-            with open("model/user_feedback.json") as f:
-                feedback_data = json.load(f)
-            yes_count = sum(1 for d in feedback_data if d['feedback'] == 'Yes')
-            no_count = sum(1 for d in feedback_data if d['feedback'] == 'No')
-            st.write(f"👍 Yes: {yes_count} | 👎 No: {no_count}")
+    st.markdown("### User Feedback Overview")
+    try:
+        with open("model/user_feedback.json") as f:
+            feedback_data = json.load(f)
+        yes_count = sum(1 for d in feedback_data if d['feedback'] == 'Yes')
+        no_count = sum(1 for d in feedback_data if d['feedback'] == 'No')
+        st.write(f"👍 Yes: {yes_count} | 👎 No: {no_count}")
 
-            if st.button("Retrain Model with Feedback"):
-                X = np.array([d['traits'] for d in feedback_data])
-                y = X.copy()
-                model = LinearRegression()
-                model.fit(X, y)
-                joblib.dump(model, model_path)
-                st.success("Model retrained!")
+        if st.button("Retrain Model with Feedback"):
+            X = np.array([d['traits'] for d in feedback_data])
+            y = X.copy()
+            model = LinearRegression()
+            model.fit(X, y)
+            joblib.dump(model, model_path)
+            st.success("Model retrained!")
 
-            st.markdown("### Manage Feedback")
-            for i, entry in enumerate(feedback_data):
-                st.write(f"{i+1}. Traits: {entry['traits']} | Feedback: {entry['feedback']}")
-                if st.button(f"Delete #{i+1}"):
-                    feedback_data.pop(i)
-                    with open("model/user_feedback.json", "w") as f:
-                        json.dump(feedback_data, f, indent=2)
-                    st.experimental_rerun()
-        except Exception as e:
-            st.warning("No feedback found or error loading feedback.")
-    else:
-        st.info("Only admin can view this section.")
-
+        st.markdown("### Manage Feedback")
+        for i, entry in enumerate(feedback_data):
+            st.write(f"{i+1}. Traits: {entry['traits']} | Feedback: {entry['feedback']}")
+            if st.button(f"Delete #{i+1}"):
+                feedback_data.pop(i)
+                with open("model/user_feedback.json", "w") as f:
+                    json.dump(feedback_data, f, indent=2)
+                st.experimental_rerun()
+    except Exception as e:
+        st.warning("No feedback found or error loading feedback.")
