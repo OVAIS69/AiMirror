@@ -1,5 +1,4 @@
 {
-  "admin": "8c6976e5b5410415bde908bd4dee15dfb16fdc5da3e3c8e9c6d7a7d4fcd6f8d8",
-  "demo": "fe01ce2a7fbac8fafaed7c982a04e229"
+  "admin": "8c6976e5b5410415bde908bd4dee15dfb16fdc5da3e3c8e9c6d7a7d4fcd6f8d8",  // SHA256("admin")
+  "demo": "0cc175b9c0f1b6a831c399e269772661"                                  // MD5("a")
 }
-
